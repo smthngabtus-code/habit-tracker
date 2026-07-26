@@ -4,8 +4,9 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 <title>습관 트래커</title>
-<link rel="apple-touch-icon" href="icon.png">
-<link rel="icon" href="icon.png">
+<link rel="apple-touch-icon" href="icon-192.png?v=2">
+<link rel="icon" href="icon-192.png?v=2">
+<link rel="manifest" href="manifest.json">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="습관 트래커">
@@ -64,6 +65,26 @@ function Check({ size = 16, color = 'currentColor', strokeWidth = 2 }) {
     </svg>
   );
 }
+function TabHabitIcon({ size = 20, color = 'currentColor' }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="18" height="18" rx="5" />
+      <polyline points="8 12 11 15 16 9" />
+    </svg>
+  );
+}
+function TabTomorrowIcon({ size = 20, color = 'currentColor' }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="5" width="18" height="16" rx="2" />
+      <line x1="3" y1="10" x2="21" y2="10" />
+      <line x1="8" y1="3" x2="8" y2="7" />
+      <line x1="16" y1="3" x2="16" y2="7" />
+      <line x1="12" y1="14" x2="12" y2="18" />
+      <line x1="10" y1="16" x2="14" y2="16" />
+    </svg>
+  );
+}
 
 const STAR_SPRITE = ['00100', '01110', '11111', '01110', '10001'];
 
@@ -91,6 +112,7 @@ function todayKey() {
 }
 
 function HabitTracker() {
+  const [activeTab, setActiveTab] = useState('habit');
   const [habits, setHabits] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [newName, setNewName] = useState('');
@@ -98,6 +120,11 @@ function HabitTracker() {
   const [celebrationStage, setCelebrationStage] = useState('idle');
   const [loading, setLoading] = useState(true);
   const [initialized, setInitialized] = useState(false);
+
+  const [todos, setTodos] = useState([]);
+  const [showTodoForm, setShowTodoForm] = useState(false);
+  const [newTodoText, setNewTodoText] = useState('');
+  const [todosInitialized, setTodosInitialized] = useState(false);
 
   const colors = {
     bg: '#F6F4EF', surface: '#FFFFFF', border: '#E7E2D8',
@@ -124,6 +151,40 @@ function HabitTracker() {
     if (!initialized) return;
     try { localStorage.setItem('habit-data', JSON.stringify({ date: todayKey(), habits })); } catch (e) {}
   }, [habits, initialized]);
+
+  useEffect(() => {
+    let loadedTodos = [];
+    try {
+      const raw = localStorage.getItem('tomorrow-todos');
+      if (raw) loadedTodos = JSON.parse(raw);
+    } catch (e) {}
+    setTodos(loadedTodos);
+    setTodosInitialized(true);
+  }, []);
+
+  useEffect(() => {
+    if (!todosInitialized) return;
+    try { localStorage.setItem('tomorrow-todos', JSON.stringify(todos)); } catch (e) {}
+  }, [todos, todosInitialized]);
+
+  const toggleTodo = (id) => {
+    setTodos(prev => prev.map(t => t.id === id ? { ...t, done: !t.done } : t));
+  };
+
+  const removeTodo = (id) => setTodos(prev => prev.filter(t => t.id !== id));
+
+  const addTodo = () => {
+    if (!newTodoText.trim()) return;
+    setTodos(prev => [...prev, { id: Date.now(), text: newTodoText.trim(), done: false }]);
+    setNewTodoText('');
+    setShowTodoForm(false);
+  };
+
+  const tomorrowLabel = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'long' });
+  })();
 
   const toggleToday = (id) => {
     setHabits(prev => prev.map(h => {
@@ -165,99 +226,183 @@ function HabitTracker() {
 
   return (
     <div style={{ minHeight: '100vh', background: colors.bg, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '40px 16px', fontFamily: "'Noto Sans KR', sans-serif" }}>
-      <div style={{ width: 380, maxWidth: '100%', background: colors.surface, borderRadius: 36, border: `1px solid ${colors.border}`, boxShadow: '0 20px 60px -20px rgba(42,40,37,0.25)', overflow: 'hidden', position: 'relative' }}>
+      <div style={{ width: 380, maxWidth: '100%', height: 720, background: colors.surface, borderRadius: 36, border: `1px solid ${colors.border}`, boxShadow: '0 20px 60px -20px rgba(42,40,37,0.25)', overflow: 'hidden', position: 'relative', display: 'flex', flexDirection: 'column' }}>
 
-        {celebrationStage === 'popup' && (
+        {activeTab === 'habit' && celebrationStage === 'popup' && (
           <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(246,244,239,0.94)', zIndex: 20 }}>
             <div style={{ animation: 'popBounce 1.1s ease-out' }}><PixelSprite unit={12} color={colors.accent} /></div>
             <div style={{ marginTop: 18, fontFamily: "'Silkscreen', monospace", fontSize: 15, color: colors.text, animation: 'fadeUp 0.4s ease-out 0.5s both' }}>오늘 목표 달성!</div>
           </div>
         )}
 
-        {celebrationStage === 'badge' && (
+        {activeTab === 'habit' && celebrationStage === 'badge' && (
           <div style={{ position: 'absolute', top: 20, right: 20, zIndex: 15, display: 'flex', alignItems: 'center', gap: 6, background: colors.accent, color: '#fff', borderRadius: 999, padding: '5px 10px 5px 8px', animation: 'badgeIn 0.35s ease-out' }}>
             <PixelSprite unit={3} color="#fff" />
             <span style={{ fontFamily: "'Silkscreen', monospace", fontSize: 10 }}>DONE</span>
           </div>
         )}
 
-        <div style={{ padding: '28px 24px 20px' }}>
-          <div style={{ fontFamily: "'Silkscreen', monospace", fontSize: 11, letterSpacing: 2, color: colors.accent, marginBottom: 10 }}>HABIT TRACKER</div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-            <div>
-              <div style={{ fontSize: 20, fontWeight: 600, color: colors.text }}>
-                {new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'long' })}
-              </div>
-              <div style={{ fontSize: 13, color: colors.textSoft, marginTop: 2 }}>오늘 완료한 습관</div>
-            </div>
-            <div style={{ fontFamily: "'Silkscreen', monospace", fontSize: 28, color: colors.text }}>
-              {doneToday}<span style={{ color: colors.textSoft, fontSize: 18 }}>/{habits.length}</span>
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: 6, marginTop: 14 }}>
-            {habits.map(h => (
-              <div key={h.id} style={{ flex: 1, height: 6, borderRadius: 3, background: h.checkedToday ? colors.accent : colors.border }} />
-            ))}
-          </div>
-        </div>
-
-        <div style={{ padding: '4px 16px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {habits.map(h => {
-            const segFilled = Math.min(10, Math.round((h.completed / h.target) * 10));
-            return (
-              <div key={h.id} style={{ background: colors.accentSoft, borderRadius: 20, padding: '14px 16px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <button onClick={() => toggleToday(h.id)} style={{
-                    width: 28, height: 28, borderRadius: 8, border: `2px solid ${h.checkedToday ? colors.accent : colors.border}`,
-                    background: h.checkedToday ? colors.accent : colors.surface, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: 'pointer',
-                  }}>
-                    {h.checkedToday && <Check size={16} color="#fff" strokeWidth={3} />}
-                  </button>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 15, fontWeight: 600, color: colors.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{h.name}</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
-                      <div style={{ display: 'flex', gap: 2 }}>
-                        {Array.from({ length: 10 }).map((_, i) => (
-                          <div key={i} style={{ width: 8, height: 8, borderRadius: 2, background: i < segFilled ? colors.accent : colors.border }} />
-                        ))}
-                      </div>
-                      <div style={{ fontFamily: "'Silkscreen', monospace", fontSize: 11, color: colors.textSoft }}>{h.completed}/{h.target}일</div>
+        <div style={{ flex: 1, overflowY: 'auto' }}>
+          {activeTab === 'habit' ? (
+            <React.Fragment>
+              <div style={{ padding: '28px 24px 20px' }}>
+                <div style={{ fontFamily: "'Silkscreen', monospace", fontSize: 11, letterSpacing: 2, color: colors.accent, marginBottom: 10 }}>HABIT TRACKER</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                  <div>
+                    <div style={{ fontSize: 20, fontWeight: 600, color: colors.text }}>
+                      {new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'long' })}
                     </div>
+                    <div style={{ fontSize: 13, color: colors.textSoft, marginTop: 2 }}>오늘 완료한 습관</div>
                   </div>
-                  <button onClick={() => removeHabit(h.id)} style={{ color: colors.textSoft, background: 'transparent', border: 'none', cursor: 'pointer', padding: 4 }}>
-                    <X size={16} />
-                  </button>
+                  <div style={{ fontFamily: "'Silkscreen', monospace", fontSize: 28, color: colors.text }}>
+                    {doneToday}<span style={{ color: colors.textSoft, fontSize: 18 }}>/{habits.length}</span>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 6, marginTop: 14 }}>
+                  {habits.map(h => (
+                    <div key={h.id} style={{ flex: 1, height: 6, borderRadius: 3, background: h.checkedToday ? colors.accent : colors.border }} />
+                  ))}
                 </div>
               </div>
-            );
-          })}
-          {habits.length === 0 && (
-            <div style={{ textAlign: 'center', padding: '32px 0', color: colors.textSoft, fontSize: 13 }}>첫 습관을 추가해보세요</div>
+
+              <div style={{ padding: '4px 16px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {habits.map(h => {
+                  const segFilled = Math.min(10, Math.round((h.completed / h.target) * 10));
+                  return (
+                    <div key={h.id} style={{ background: colors.accentSoft, borderRadius: 20, padding: '14px 16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <button onClick={() => toggleToday(h.id)} style={{
+                          width: 28, height: 28, borderRadius: 8, border: `2px solid ${h.checkedToday ? colors.accent : colors.border}`,
+                          background: h.checkedToday ? colors.accent : colors.surface, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: 'pointer',
+                        }}>
+                          {h.checkedToday && <Check size={16} color="#fff" strokeWidth={3} />}
+                        </button>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 15, fontWeight: 600, color: colors.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{h.name}</div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+                            <div style={{ display: 'flex', gap: 2 }}>
+                              {Array.from({ length: 10 }).map((_, i) => (
+                                <div key={i} style={{ width: 8, height: 8, borderRadius: 2, background: i < segFilled ? colors.accent : colors.border }} />
+                              ))}
+                            </div>
+                            <div style={{ fontFamily: "'Silkscreen', monospace", fontSize: 11, color: colors.textSoft }}>{h.completed}/{h.target}일</div>
+                          </div>
+                        </div>
+                        <button onClick={() => removeHabit(h.id)} style={{ color: colors.textSoft, background: 'transparent', border: 'none', cursor: 'pointer', padding: 4 }}>
+                          <X size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+                {habits.length === 0 && (
+                  <div style={{ textAlign: 'center', padding: '32px 0', color: colors.textSoft, fontSize: 13 }}>첫 습관을 추가해보세요</div>
+                )}
+              </div>
+
+              <div style={{ padding: '0 16px 24px' }}>
+                {showForm ? (
+                  <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 20, padding: 16 }}>
+                    <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="습관 이름" style={{ width: '100%', border: 'none', outline: 'none', fontSize: 15, color: colors.text, marginBottom: 10, background: 'transparent' }} autoFocus />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+                      <span style={{ fontSize: 13, color: colors.textSoft }}>목표 일수</span>
+                      <input type="number" value={newTarget} onChange={e => setNewTarget(e.target.value)} style={{ width: 60, border: `1px solid ${colors.border}`, borderRadius: 8, padding: '4px 8px', fontSize: 13, color: colors.text }} />
+                      <span style={{ fontSize: 13, color: colors.textSoft }}>일</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button onClick={addHabit} style={{ flex: 1, background: colors.accent, color: '#fff', border: 'none', borderRadius: 12, padding: '10px 0', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>추가</button>
+                      <button onClick={() => setShowForm(false)} style={{ padding: '10px 16px', background: 'transparent', border: 'none', color: colors.textSoft, fontSize: 14, cursor: 'pointer' }}>취소</button>
+                    </div>
+                  </div>
+                ) : (
+                  <button onClick={() => setShowForm(true)} style={{
+                    width: '100%', border: `1.5px dashed ${colors.border}`, borderRadius: 20, padding: '14px 0',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, color: colors.textSoft, background: 'transparent', cursor: 'pointer', fontSize: 14,
+                  }}>
+                    <Plus size={16} /> 새 습관 추가
+                  </button>
+                )}
+              </div>
+            </React.Fragment>
+          ) : (
+            <React.Fragment>
+              <div style={{ padding: '28px 24px 20px' }}>
+                <div style={{ fontFamily: "'Silkscreen', monospace", fontSize: 11, letterSpacing: 2, color: colors.accent, marginBottom: 10 }}>TOMORROW</div>
+                <div style={{ fontSize: 20, fontWeight: 600, color: colors.text }}>{tomorrowLabel}</div>
+                <div style={{ fontSize: 13, color: colors.textSoft, marginTop: 2 }}>잊지 말고 할 일</div>
+              </div>
+
+              <div style={{ padding: '4px 16px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {todos.map(t => (
+                  <div key={t.id} style={{ background: colors.accentSoft, borderRadius: 20, padding: '14px 16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <button onClick={() => toggleTodo(t.id)} style={{
+                        width: 28, height: 28, borderRadius: 8, border: `2px solid ${t.done ? colors.accent : colors.border}`,
+                        background: t.done ? colors.accent : colors.surface, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: 'pointer',
+                      }}>
+                        {t.done && <Check size={16} color="#fff" strokeWidth={3} />}
+                      </button>
+                      <div style={{
+                        flex: 1, minWidth: 0, fontSize: 15, fontWeight: 600,
+                        color: t.done ? colors.textSoft : colors.text,
+                        textDecoration: t.done ? 'line-through' : 'none',
+                        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                      }}>{t.text}</div>
+                      <button onClick={() => removeTodo(t.id)} style={{ color: colors.textSoft, background: 'transparent', border: 'none', cursor: 'pointer', padding: 4 }}>
+                        <X size={16} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                {todos.length === 0 && (
+                  <div style={{ textAlign: 'center', padding: '32px 0', color: colors.textSoft, fontSize: 13 }}>내일 할 일을 추가해보세요</div>
+                )}
+              </div>
+
+              <div style={{ padding: '0 16px 24px' }}>
+                {showTodoForm ? (
+                  <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 20, padding: 16 }}>
+                    <input
+                      value={newTodoText}
+                      onChange={e => setNewTodoText(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') addTodo(); }}
+                      placeholder="할 일"
+                      style={{ width: '100%', border: 'none', outline: 'none', fontSize: 15, color: colors.text, marginBottom: 14, background: 'transparent' }}
+                      autoFocus
+                    />
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button onClick={addTodo} style={{ flex: 1, background: colors.accent, color: '#fff', border: 'none', borderRadius: 12, padding: '10px 0', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>추가</button>
+                      <button onClick={() => setShowTodoForm(false)} style={{ padding: '10px 16px', background: 'transparent', border: 'none', color: colors.textSoft, fontSize: 14, cursor: 'pointer' }}>취소</button>
+                    </div>
+                  </div>
+                ) : (
+                  <button onClick={() => setShowTodoForm(true)} style={{
+                    width: '100%', border: `1.5px dashed ${colors.border}`, borderRadius: 20, padding: '14px 0',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, color: colors.textSoft, background: 'transparent', cursor: 'pointer', fontSize: 14,
+                  }}>
+                    <Plus size={16} /> 내일 할 일 추가
+                  </button>
+                )}
+              </div>
+            </React.Fragment>
           )}
         </div>
 
-        <div style={{ padding: '0 16px 24px' }}>
-          {showForm ? (
-            <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 20, padding: 16 }}>
-              <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="습관 이름" style={{ width: '100%', border: 'none', outline: 'none', fontSize: 15, color: colors.text, marginBottom: 10, background: 'transparent' }} autoFocus />
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-                <span style={{ fontSize: 13, color: colors.textSoft }}>목표 일수</span>
-                <input type="number" value={newTarget} onChange={e => setNewTarget(e.target.value)} style={{ width: 60, border: `1px solid ${colors.border}`, borderRadius: 8, padding: '4px 8px', fontSize: 13, color: colors.text }} />
-                <span style={{ fontSize: 13, color: colors.textSoft }}>일</span>
-              </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={addHabit} style={{ flex: 1, background: colors.accent, color: '#fff', border: 'none', borderRadius: 12, padding: '10px 0', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>추가</button>
-                <button onClick={() => setShowForm(false)} style={{ padding: '10px 16px', background: 'transparent', border: 'none', color: colors.textSoft, fontSize: 14, cursor: 'pointer' }}>취소</button>
-              </div>
-            </div>
-          ) : (
-            <button onClick={() => setShowForm(true)} style={{
-              width: '100%', border: `1.5px dashed ${colors.border}`, borderRadius: 20, padding: '14px 0',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, color: colors.textSoft, background: 'transparent', cursor: 'pointer', fontSize: 14,
-            }}>
-              <Plus size={16} /> 새 습관 추가
-            </button>
-          )}
+        <div style={{ display: 'flex', borderTop: `1px solid ${colors.border}`, flexShrink: 0, background: colors.surface }}>
+          <button onClick={() => setActiveTab('habit')} style={{
+            flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: '12px 0 16px',
+            background: 'transparent', border: 'none', cursor: 'pointer', color: activeTab === 'habit' ? colors.accent : colors.textSoft,
+          }}>
+            <TabHabitIcon size={20} color={activeTab === 'habit' ? colors.accent : colors.textSoft} />
+            <span style={{ fontSize: 11, fontWeight: 600 }}>습관</span>
+          </button>
+          <button onClick={() => setActiveTab('tomorrow')} style={{
+            flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: '12px 0 16px',
+            background: 'transparent', border: 'none', cursor: 'pointer', color: activeTab === 'tomorrow' ? colors.accent : colors.textSoft,
+          }}>
+            <TabTomorrowIcon size={20} color={activeTab === 'tomorrow' ? colors.accent : colors.textSoft} />
+            <span style={{ fontSize: 11, fontWeight: 600 }}>할 일</span>
+          </button>
         </div>
       </div>
     </div>
