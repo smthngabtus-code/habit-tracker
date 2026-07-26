@@ -4,9 +4,8 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 <title>습관 트래커</title>
-<link rel="apple-touch-icon" href="icon-192.png?v=2">
-<link rel="icon" href="icon-192.png?v=2">
-<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.png?v=3">
+<link rel="icon" href="icon.png?v=3">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="습관 트래커">
@@ -111,6 +110,27 @@ function todayKey() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+function dateKeyForOffset(offsetDays) {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDays);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function relativeDateLabel(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const diffDays = Math.round((d - today) / 86400000);
+  const formatted = d.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' });
+  let rel;
+  if (diffDays === 0) rel = '오늘';
+  else if (diffDays === 1) rel = '내일';
+  else if (diffDays === 2) rel = '모레';
+  else if (diffDays > 2) rel = `${diffDays}일 후`;
+  else rel = '지난 일정';
+  return `${rel} · ${formatted}`;
+}
+
 function HabitTracker() {
   const [activeTab, setActiveTab] = useState('habit');
   const [habits, setHabits] = useState([]);
@@ -124,6 +144,7 @@ function HabitTracker() {
   const [todos, setTodos] = useState([]);
   const [showTodoForm, setShowTodoForm] = useState(false);
   const [newTodoText, setNewTodoText] = useState('');
+  const [newTodoDate, setNewTodoDate] = useState(dateKeyForOffset(1));
   const [todosInitialized, setTodosInitialized] = useState(false);
 
   const colors = {
@@ -175,16 +196,14 @@ function HabitTracker() {
 
   const addTodo = () => {
     if (!newTodoText.trim()) return;
-    setTodos(prev => [...prev, { id: Date.now(), text: newTodoText.trim(), done: false }]);
+    const date = newTodoDate || dateKeyForOffset(1);
+    setTodos(prev => [...prev, { id: Date.now(), text: newTodoText.trim(), done: false, date }]);
     setNewTodoText('');
+    setNewTodoDate(dateKeyForOffset(1));
     setShowTodoForm(false);
   };
 
-  const tomorrowLabel = (() => {
-    const d = new Date();
-    d.setDate(d.getDate() + 1);
-    return d.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'long' });
-  })();
+  const groupedTodoDates = [...new Set(todos.map(t => t.date))].sort();
 
   const toggleToday = (id) => {
     setHabits(prev => prev.map(h => {
@@ -327,35 +346,44 @@ function HabitTracker() {
           ) : (
             <React.Fragment>
               <div style={{ padding: '28px 24px 20px' }}>
-                <div style={{ fontFamily: "'Silkscreen', monospace", fontSize: 11, letterSpacing: 2, color: colors.accent, marginBottom: 10 }}>TOMORROW</div>
-                <div style={{ fontSize: 20, fontWeight: 600, color: colors.text }}>{tomorrowLabel}</div>
-                <div style={{ fontSize: 13, color: colors.textSoft, marginTop: 2 }}>잊지 말고 할 일</div>
+                <div style={{ fontFamily: "'Silkscreen', monospace", fontSize: 11, letterSpacing: 2, color: colors.accent, marginBottom: 10 }}>UPCOMING</div>
+                <div style={{ fontSize: 20, fontWeight: 600, color: colors.text }}>예정된 할 일</div>
+                <div style={{ fontSize: 13, color: colors.textSoft, marginTop: 2 }}>날짜별로 미리 적어두는 일회성 할 일</div>
               </div>
 
-              <div style={{ padding: '4px 16px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {todos.map(t => (
-                  <div key={t.id} style={{ background: colors.accentSoft, borderRadius: 20, padding: '14px 16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <button onClick={() => toggleTodo(t.id)} style={{
-                        width: 28, height: 28, borderRadius: 8, border: `2px solid ${t.done ? colors.accent : colors.border}`,
-                        background: t.done ? colors.accent : colors.surface, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: 'pointer',
-                      }}>
-                        {t.done && <Check size={16} color="#fff" strokeWidth={3} />}
-                      </button>
-                      <div style={{
-                        flex: 1, minWidth: 0, fontSize: 15, fontWeight: 600,
-                        color: t.done ? colors.textSoft : colors.text,
-                        textDecoration: t.done ? 'line-through' : 'none',
-                        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                      }}>{t.text}</div>
-                      <button onClick={() => removeTodo(t.id)} style={{ color: colors.textSoft, background: 'transparent', border: 'none', cursor: 'pointer', padding: 4 }}>
-                        <X size={16} />
-                      </button>
+              <div style={{ padding: '4px 16px 16px', display: 'flex', flexDirection: 'column', gap: 18 }}>
+                {groupedTodoDates.map(date => (
+                  <div key={date}>
+                    <div style={{ fontFamily: "'Silkscreen', monospace", fontSize: 11, color: colors.textSoft, marginBottom: 8, paddingLeft: 4 }}>
+                      {relativeDateLabel(date)}
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {todos.filter(t => t.date === date).map(t => (
+                        <div key={t.id} style={{ background: colors.accentSoft, borderRadius: 20, padding: '14px 16px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                            <button onClick={() => toggleTodo(t.id)} style={{
+                              width: 28, height: 28, borderRadius: 8, border: `2px solid ${t.done ? colors.accent : colors.border}`,
+                              background: t.done ? colors.accent : colors.surface, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: 'pointer',
+                            }}>
+                              {t.done && <Check size={16} color="#fff" strokeWidth={3} />}
+                            </button>
+                            <div style={{
+                              flex: 1, minWidth: 0, fontSize: 15, fontWeight: 600,
+                              color: t.done ? colors.textSoft : colors.text,
+                              textDecoration: t.done ? 'line-through' : 'none',
+                              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                            }}>{t.text}</div>
+                            <button onClick={() => removeTodo(t.id)} style={{ color: colors.textSoft, background: 'transparent', border: 'none', cursor: 'pointer', padding: 4 }}>
+                              <X size={16} />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 ))}
                 {todos.length === 0 && (
-                  <div style={{ textAlign: 'center', padding: '32px 0', color: colors.textSoft, fontSize: 13 }}>내일 할 일을 추가해보세요</div>
+                  <div style={{ textAlign: 'center', padding: '32px 0', color: colors.textSoft, fontSize: 13 }}>할 일을 추가해보세요</div>
                 )}
               </div>
 
@@ -367,9 +395,18 @@ function HabitTracker() {
                       onChange={e => setNewTodoText(e.target.value)}
                       onKeyDown={e => { if (e.key === 'Enter') addTodo(); }}
                       placeholder="할 일"
-                      style={{ width: '100%', border: 'none', outline: 'none', fontSize: 15, color: colors.text, marginBottom: 14, background: 'transparent' }}
+                      style={{ width: '100%', border: 'none', outline: 'none', fontSize: 15, color: colors.text, marginBottom: 12, background: 'transparent' }}
                       autoFocus
                     />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+                      <span style={{ fontSize: 13, color: colors.textSoft }}>날짜</span>
+                      <input
+                        type="date"
+                        value={newTodoDate}
+                        onChange={e => setNewTodoDate(e.target.value)}
+                        style={{ border: `1px solid ${colors.border}`, borderRadius: 8, padding: '6px 8px', fontSize: 13, color: colors.text, background: 'transparent' }}
+                      />
+                    </div>
                     <div style={{ display: 'flex', gap: 8 }}>
                       <button onClick={addTodo} style={{ flex: 1, background: colors.accent, color: '#fff', border: 'none', borderRadius: 12, padding: '10px 0', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>추가</button>
                       <button onClick={() => setShowTodoForm(false)} style={{ padding: '10px 16px', background: 'transparent', border: 'none', color: colors.textSoft, fontSize: 14, cursor: 'pointer' }}>취소</button>
@@ -380,7 +417,7 @@ function HabitTracker() {
                     width: '100%', border: `1.5px dashed ${colors.border}`, borderRadius: 20, padding: '14px 0',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, color: colors.textSoft, background: 'transparent', cursor: 'pointer', fontSize: 14,
                   }}>
-                    <Plus size={16} /> 내일 할 일 추가
+                    <Plus size={16} /> 할 일 추가
                   </button>
                 )}
               </div>
